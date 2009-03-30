@@ -1,4 +1,4 @@
-package Test::Database::Driver::SQLite;
+package Test::Database::Driver::SQLite2;
 use strict;
 use warnings;
 
@@ -14,7 +14,7 @@ sub _version { return DBI->connect( $_[0]->bare_dsn() )->{sqlite_version}; }
 
 sub dsn {
     my ( $self, $dbname ) = @_;
-    return 'dbi:SQLite:dbname='
+    return 'dbi:SQLite2:dbname='
         . File::Spec->catdir( $self->base_dir(), $dbname );
 }
 
@@ -24,22 +24,22 @@ sub drop_database {
     unlink $dbfile;
 }
 
-'SQLite';
+'SQLite2';
 
 __END__
 
 =head1 NAME
 
-Test::Database::Driver::SQLite - A Test::Database driver for SQLite
+Test::Database::Driver::SQLite2 - A Test::Database driver for SQLite2
 
 =head1 SYNOPSIS
 
     use Test::Database;
-    my $dbh = Test::Database->dbh( 'SQLite' );
+    my $dbh = Test::Database->dbh( 'SQLite2' );
 
 =head1 DESCRIPTION
 
-This module is the C<Test::Database> driver for C<DBD::SQLite>.
+This module is the C<Test::Database> driver for C<DBD::SQLite2>.
 
 =head1 SEE ALSO
 

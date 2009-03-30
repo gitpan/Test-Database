@@ -2,52 +2,69 @@ use strict;
 use warnings;
 use Test::More;
 use Test::Database;
-use File::Spec;
-use DBI;
-use List::Util qw( shuffle );
+use Test::Database::Driver;
 
-# hardcoded sorted list of our drivers
-my @available_drivers = qw( CSV DBM SQLite mysql );
+my @drivers = Test::Database->all_drivers();
 
-# intersection with DBI->available_drivers
-my %available_drivers = map { $_ => 1 } @available_drivers;
-my @drivers
-    = sort grep { exists $available_drivers{$_} } DBI->available_drivers;
+plan tests => @drivers * ( 1 + 2 * 13 ) + 2;
 
-plan tests => 2 + 3 * @available_drivers + @drivers + 2;
+my $base = 'Test::Database::Driver';
 
-is_deeply( [ Test::Database->available_drivers() ],
-    \@available_drivers, 'available_drivers()' );
-is_deeply( [ Test::Database->drivers() ], \@drivers, 'drivers()' );
+for my $name ( Test::Database->all_drivers() ) {
+    my $class = "Test::Database::Driver::$name";
+    use_ok($class);
 
-# check all drivers
-for my $name ( Test::Database->available_drivers() ) {
-    use_ok("Test::Database::Driver::$name");
+    for my $t (
+        [ $base->new( driver => $name ), $base ],
+        [ $class->new(), $class ],
+        )
+    {
+        my ( $driver, $created_by ) = @$t;
+        diag "$name driver (created by $created_by)";
 
-    is( "Test::Database::Driver::$name"->name(),
-        $name, "$name driver knows its name" );
+        # class and name
+        my $desc = "$name driver";
+        isa_ok( $driver, $class, $desc );
+        is( $driver->name(), $name, "$desc has the expected name()" );
 
-    like(
-        "Test::Database::Driver::$name"->base_dir(),
-        qr/Test-Database-.*\Q$name\E/,
-        "$name\'s base_dir() looks like expected"
-    );
+        # base_dir
+        my $dir = $driver->base_dir();
+        ok( $dir, "$desc has a base_dir(): $dir" );
+        like( $dir, qr/Test-Database-.*\Q$name\E/,
+            "$desc\'s base_dir() looks like expected" );
+        ok( -d $dir, "$desc base_dir() is a directory" );
+
+        # version
+        my $version;
+        ok( eval { $version = $driver->version() },
+            "$desc has a version(): $version"
+        );
+        isa_ok( $version, 'version', "$desc version()" );
+        diag $@ if $@;
+
+        # drh, bare_dsn, username, password, connection_info
+        isa_ok( $driver->drh(), 'DBI::dr', "$desc drh()" );
+        ok( $driver->bare_dsn(), "$desc has are_ dsn()" );
+        ok( defined $driver->username(), "$desc has a username()" );
+        ok( defined $driver->password(), "$desc has a password()" );
+        is_deeply(
+            [ $driver->connection_info() ],
+            [ map { $driver->$_ } qw< bare_dsn username password > ],
+            "$desc has aconnection_info()"
+        );
+
+        # as_string
+        my $re = join '', map { "$_ = .*\n" } driver => $driver->essentials();
+        like( $driver->as_string(), qr/\A$re\z/, "$desc as string" );
+    }
 }
 
-# test that Test::Database->drivers( @list ) only returns
-# the installed drivers from the list
-my @will;
-my @wont = qw( Zapeth );
-is_deeply( [ Test::Database->drivers(@wont) ], \@will,
-    "drivers( @wont ) =>" );
+# get all loaded drivers
+@drivers = Test::Database->drivers();
+cmp_ok( scalar @drivers, '>=', 1, 'At least on driver loaded' );
 
-for my $name ( Test::Database->drivers() ) {
-    push @will, $name;
-    my @list = shuffle @will, @wont;
-    is_deeply( [ Test::Database->drivers(@list) ],
-        \@will, "drivers( @list ) => @will" );
-}
-
-my @list = shuffle( Test::Database->available_drivers(), @wont );
-is_deeply( [ Test::Database->drivers() ], \@will, "drivers(@list) => @will" );
+# unload them
+Test::Database->unload_drivers();
+@drivers = Test::Database->drivers();
+is( scalar @drivers, 0, 'All drivers were unloaded' );
 

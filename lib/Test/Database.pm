@@ -2,21 +2,12 @@ package Test::Database;
 use warnings;
 use strict;
 
+use File::HomeDir;
 use File::Spec;
 use DBI;
 use Carp;
 
-our $VERSION = '0.02';
-
-use Exporter;
-our @ISA = qw( Exporter );
-
-our @EXPORT_OK = (
-    'test_db_handle',
-    map {"test_db_$_"} my @attributes
-        = qw( dbh dsn username password connection_info )
-);
-our %EXPORT_TAGS = ( all => \@EXPORT_OK );
+our $VERSION = '0.99';
 
 use Test::Database::Driver;
 
@@ -24,57 +15,145 @@ use Test::Database::Driver;
 # driver information
 #
 my @DRIVERS;
-my @ALL_DRIVERS;
-my %DBI_DRIVERS = map { $_ => 1 } DBI->available_drivers();
+my @DRIVERS_OUR;
+my %DRIVERS_DBI = map { $_ => 1 } DBI->available_drivers();
+my @DRIVERS_OK;
 
 # find the list of all drivers we support
-for my $dir (@INC) {
-    opendir my $dh, File::Spec->catdir( $dir, qw< Test Database Driver > )
-        or next;
-    push @ALL_DRIVERS, map { s/\.pm$//; $_ } grep {/\.pm$/} readdir $dh;
-    closedir $dh;
+{
+    my %seen;
+    for my $dir (@INC) {
+        opendir my $dh, File::Spec->catdir( $dir, qw< Test Database Driver > )
+            or next;
+        $seen{$_}++ for map { s/\.pm$//; $_ } grep {/\.pm$/} readdir $dh;
+        closedir $dh;
+    }
+    @DRIVERS_OUR = sort keys %seen;
 }
 
-@ALL_DRIVERS = do {
-    my %seen;
-    sort grep { !$seen{$_}++ } @ALL_DRIVERS;
-};
-@DRIVERS = grep { exists $DBI_DRIVERS{$_} } @ALL_DRIVERS;
+@DRIVERS_OK = grep { exists $DRIVERS_DBI{$_} } @DRIVERS_OUR;
 
-sub available_drivers { return @ALL_DRIVERS }
+# automatically load all drivers in @DRIVERS_OK
+# (but ignore compilation errors)
+eval "require Test::Database::Driver::$_" for @DRIVERS_OK;
+
+# load all file-based drivers
+push @DRIVERS, map { Test::Database::Driver->new( driver => $_ ) }
+    grep { "Test::Database::Driver::$_"->is_filebased() } @DRIVERS_OK;
+
+# load drivers from configuration
+__PACKAGE__->load_drivers();
+
+#
+# private functions
+#
+sub _rcfile {
+    File::Spec->catfile( File::HomeDir->my_data(), '.test-database' );
+}
+
+sub _canonicalize_drivers {
+    my %seen;
+    @DRIVERS = grep { !$seen{ $_->as_string() }++ } @DRIVERS;
+}
+
+#
+# methods
+#
+sub unload_drivers { @DRIVERS = (); }
+
+sub all_drivers { return @DRIVERS_OUR }
+
+sub available_drivers { return @DRIVERS_OK }
+
+sub save_drivers {
+    my ( $class, $file ) = @_;
+    $file ||= _rcfile();
+
+    _canonicalize_drivers();
+    open my $fh, '>', $file or croak "Can't open $file for writing: $!";
+    print $fh map { $_->as_string, "\n" } @DRIVERS;
+    close $fh;
+}
+
+sub load_drivers {
+    my ( $class, $file ) = @_;
+    $file ||= _rcfile();
+
+    my %args;
+    open my $fh, '<', $file or croak "Can't open $file for reading: $!";
+    while (<$fh>) {
+        next if /^\s*(?:#|$)/;    # skip blank lines and comments
+
+        /\s*(\w+)\s*=\s*(.*)\s*/ && do {
+            my ( $key, $value ) = ( $1, $2 );
+            $value = Test::Database::Driver::_unquote( $value )
+                 if $value =~ /\A["']/;
+            if ( $key eq 'driver' && keys %args ) {
+                push @DRIVERS, Test::Database::Driver->new(%args);
+                %args = ();
+            }
+            $args{$key} = $value;
+            next;
+            };
+
+        # unknown line
+        croak "Can't parse line at $file, line $.:\n$_\n ";
+    }
+    push @DRIVERS, Test::Database::Driver->new(%args)
+        if keys %args;
+    close $fh;
+
+    _canonicalize_drivers();
+}
 
 sub drivers {
-    my ( $class, @requested ) = @_;
-    return @DRIVERS if !@requested;
+    my ( $class, @requests ) = @_;
+    return @DRIVERS if !@requests;
 
-    my %requested = map { $_ => '' } @requested;
-    return grep { exists $requested{$_} } @DRIVERS;
+    # turn strings (driver name) into actual requests
+    @requests = map { (ref) ? $_ : { driver => $_ } } @requests;
+
+    my @drivers;
+    for my $request (@requests) {
+        for my $driver ( grep { $_->{driver} eq $request->{driver} }
+            @DRIVERS )
+        {
+            next
+                if exists $request->{min_version}
+                    && $driver->{version} < $request->{min_version};
+            next
+                if exists $request->{max_version}
+                    && $driver->{version} > $request->{max_version};
+            push @drivers, $driver;
+        }
+    }
+
+    my %seen;
+    return grep { !$seen{$_}++ } @drivers;
 }
 
-#
-# methods delegated to the handle
-#
-for my $attr ( 'handle', @attributes ) {
-    no strict 'refs';
-    *{"test_db_$attr"} = sub { __PACKAGE__->$attr(@_) };
+sub handles {
+    my ( $class, @requests ) = @_;
 
-    next if $attr eq 'handle';    # skip this one
-    *{$attr} = sub {
-        my $class = shift;
-        return $class->handle(@_)->$attr;
-    };
+    # turn strings (driver name) into actual requests
+    @requests = map { (ref) ? $_ : { driver => $_ } } @requests;
+
+    # first filter on the drivers
+    my @drivers = $class->drivers(@requests);
+
+    # then on the handles
+    return map { $_->handles(@requests) } @drivers;
 }
 
-sub handle {
-    my ( $class, $driver, $name ) = @_;
-
-    eval "use Test::Database::Driver::$driver; 1;"
-        or croak $@ =~ /^(.*) at /g;
-
-    return "Test::Database::Driver::$driver"->handle($name);
+sub dbh {
+    my ( $class, @requests ) = @_;
+    return map { $_->dbh() } $class->handles(@requests);
 }
 
-sub cleanup { Test::Database::Driver->cleanup(); }
+sub cleanup {
+    $_->cleanup()
+        for map { Test::Database::Driver->new( driver => $_ ) } @DRIVERS_OK;
+}
 
 'TRUE';
 
@@ -169,83 +248,69 @@ C<Test::Database> provides the following methods:
 
 =over 4
 
+=item all_drivers()
+
+Return the list of supported drivers.
+
 =item available_drivers()
 
-Return the list of supported DBI drivers.
-
-=item drivers( @list )
-
-Return the list of supported DBI drivers that have been detected as installed.
+Return the list of supported DBI drivers that are installed.
 
 This is the intersection of the results of
-C<< Test::Database->available_drivers() >> and 
-C<< DBI->available_drivers() >>.
+C<< Test::Database->all_drivers() >> and C<< DBI->available_drivers() >>.
 
-If C<@list> is provided, only the available drivers in the list are
-returned.
+=item load_drivers( [ $file ] )
 
-=item handle( $driver [, $name ] )
+Read the database drivers configuration from the given C<$file> and
+load them.
 
-If C<$name> is not provided, the default C<Test::Database::Handle> object
-for the driver is provided. No garantees are made on its being empty.
+If C<$file> is not given, the local equivalent of F<~/.test-database> is used.
 
-The default database handle is obtained from the local configuration
-(stored in the C<Test::Database::MyConfig> module), then from the global
-configuration (stored in the C<Test::Database::Config> module). If no
-configuration information is available, C<Test::Database> will then try
-to create a default temporary database, if the driver supports it.
+=item save_drivers( [ $file ] )
 
-The database will be created the first time, and and subsequent calls
-are garanteed to provide connection information to the same database,
-so you can share data between your scripts.
+Saver the available database drivers configuration to the given C<$file>.
 
-=item dbh( $driver [, $name ] )
+If C<$file> is not given, the local equivalent of F<~/.test-database> is used.
 
-=item connection_info( $driver [, $name ] )
+=item unload_drivers()
 
-=item dsn( $driver [, $name ] )
+Unload all drivers.
 
-=item username( $driver [, $name ] )
+=item drivers( @requests )
 
-=item password( $driver [, $name ] )
+Return the C<Test::Database::Driver> objects corresponding to
+all the available drivers.
 
-Shortcut methods for:
+If C<@requests> is provided, only the drivers that match one of the
+requests are returned.
 
-    Test::Database->handle( $driver [, $name ] )->dbh();
-    Test::Database->handle( $driver [, $name ] )->connection_info();
-    Test::Database->handle( $driver [, $name ] )->dsn();
-    Test::Database->handle( $driver [, $name ] )->username();
-    Test::Database->handle( $driver [, $name ] )->password();
+See L<REQUESTS> for details about writing requests.
 
-See C<Test::Database::Handle> for details.
+=item handles( @requests )
+
+Return a set of C<Test::Database::Handle> objects that matche the
+given C<@requests>.
+
+If C<@requests> is not provided, return a handle for each database
+that exists in each driver.
+
+See L<REQUESTS> for details about writing requests.
+
+=item dbh( @requests )
+
+Return the DBI database handles for the given C<@requests>.
+
+It returns a dbh for each handle that would be returned by
+calling C<handles( @requests )>.
+
+See L<REQUESTS> for details about writing requests.
+See C<Test::Database::Handle> for details about handles.
 
 =item cleanup()
 
-Remove the directory used by C<Test::Database> drivers.
+Call the C<cleanup()> method of all available drivers.
 
 =back
-
-=head1 EXPORTS
-
-All the methods can be exported as functions (prefixed with C<test_db_>)
-using the C<:all> tag.
-
-So you can either do:
-
-    use Test::Database;
-    my $dbh = Test::Database->dbh( 'SQLite' );
-
-or:
-
-    use Test::Database qw( :all );
-    my $dbh = test_db_dbh( 'SQLite' );
-
-or export only the one you want:
-
-    use Test::Database qw( test_db_dbh );
-    my $dbh = test_db_dbh( 'SQLite' );
-
-=cut
 
 =head1 AUTHOR
 
@@ -293,27 +358,8 @@ Some of the items on the TODO list:
 
 =item *
 
-Allow options to be passed to handle()
-
-At the moment, it's possible to use connection_info() and  pass options
-to DBI->connect() directly.
-
-=item *
-
-Allow C<handle()> to be called with no parameter and return
-a handle to a test database (need to find an ordering scheme for
-the drivers).
-
-=item *
-
-Add support for C<DBI_DSN>. If C<handle()> is called with no parameters,
-or if DBI_DSN matches the requested driver, first use this DSN.
-
-=item *
-
-Add support for a C<Test::Database::Config> module, holding system-wide
-test database configuration. Probably need to create an interactive way
-to set it up.
+Add a database engine autodetection script/module, to automatically
+write the F<.test-database> configuration file.
 
 =back
 
@@ -324,9 +370,22 @@ Thanks to C<< <perl-qa@perl.org> >> for early comments.
 Thanks to Nelson Ferraz for writing C<DBIx::Slice>, the testing of
 which made me want to have a generic way to obtain a test database.
 
+Thanks to Mark Lawrence for discussing this module with me, and
+sending me an alternative implemenation to show me what he needed.
+
+Thanks to Kristian Koehntopp for helping me write a mysql driver,
+and to Greg Sabino Mullane for writing a full Postgres driver,
+none of which made it into the final release because of the complete
+change in goals and implementation between versions 0.02 and 0.03.
+
+The work leading to the new implementation was carried on during
+the Perl QA Hackathon, held in Birmingham in March 2009. Thanks to
+Birmingham.pm for organizing it and to Booking.com for sending me
+there.
+
 =head1 COPYRIGHT
 
-Copyright 2008 Philippe Bruhat (BooK), all rights reserved.
+Copyright 2008-2009 Philippe Bruhat (BooK), all rights reserved.
 
 =head1 LICENSE
 

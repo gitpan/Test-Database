@@ -2,19 +2,27 @@ package Test::Database::Driver::CSV;
 use strict;
 use warnings;
 
-use Test::Database::Driver;
-our @ISA = qw( Test::Database::Driver );
-
 use File::Spec;
 use File::Path;
 
-__PACKAGE__->init();
+use Test::Database::Driver;
+our @ISA = qw( Test::Database::Driver );
 
-sub create_database {
-    my ( $class, $config, $dbname ) = @_;
-    my $dbdir = File::Spec->catdir( $class->base_dir(), $dbname );
+sub is_filebased {1}
 
-    return Test::Database::Handle->new( dsn => "dbi:CSV:f_dir=$dbdir" );
+sub _version { return Text::CSV_XS->VERSION; }
+
+sub dsn {
+    my ( $self, $dbname ) = @_;
+    my $dbdir = File::Spec->catdir( $self->base_dir(), $dbname );
+    mkpath( [$dbdir] );
+    return "dbi:CSV:f_dir=$dbdir";
+}
+
+sub drop_database {
+    my ( $self, $dbname ) = @_;
+    my $dbdir = File::Spec->catdir( $self->base_dir(), $dbname );
+    rmtree( [$dbdir] );
 }
 
 'CSV';
@@ -44,7 +52,7 @@ Philippe Bruhat (BooK), C<< <book@cpan.org> >>
 
 =head1 COPYRIGHT
 
-Copyright 2008 Philippe Bruhat (BooK), all rights reserved.
+Copyright 2008-2009 Philippe Bruhat (BooK), all rights reserved.
 
 =head1 LICENSE
 

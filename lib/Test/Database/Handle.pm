@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 
 # basic accessors
-for my $attr (qw( driver dsn username password )) {
+for my $attr (qw( driver dsn username password name )) {
     no strict 'refs';
     *{$attr} = sub { return $_[0]{$attr} };
 }
@@ -12,13 +12,13 @@ for my $attr (qw( driver dsn username password )) {
 sub new {
     my ( $class, %args ) = @_;
 
-    croak "dsn argument required" if !exists $args{dsn};
+    exists $args{$_} or croak "$_ argument required"
+       for qw< driver dsn name >;
 
     return bless {
         username => '',
         password => '',
         %args,
-        driver => $args{dsn} =~ /^dbi:(\w+)/g,
     }, $class;
 }
 
@@ -92,6 +92,10 @@ connection triplet returned by C<connection_info()>.
 
 Return the DBI driver name, as computed from the C<dsn>.
 
+=item name()
+
+Name of the database in the corresponding driver.
+
 =back
 
 =head1 AUTHOR
@@ -100,7 +104,7 @@ Philippe Bruhat (BooK), C<< <book@cpan.org> >>
 
 =head1 COPYRIGHT
 
-Copyright 2008 Philippe Bruhat (BooK), all rights reserved.
+Copyright 2008-2009 Philippe Bruhat (BooK), all rights reserved.
 
 =head1 LICENSE
 
