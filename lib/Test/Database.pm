@@ -7,7 +7,7 @@ use File::Spec;
 use DBI;
 use Carp;
 
-our $VERSION = '0.99';
+our $VERSION = '0.99_01';
 
 use Test::Database::Driver;
 
@@ -42,7 +42,7 @@ push @DRIVERS, map { Test::Database::Driver->new( driver => $_ ) }
     grep { "Test::Database::Driver::$_"->is_filebased() } @DRIVERS_OK;
 
 # load drivers from configuration
-__PACKAGE__->load_drivers();
+__PACKAGE__->load_drivers() if -e _rcfile();
 
 #
 # private functions
@@ -67,7 +67,7 @@ sub available_drivers { return @DRIVERS_OK }
 
 sub save_drivers {
     my ( $class, $file ) = @_;
-    $file ||= _rcfile();
+    $file = _rcfile() if !defined $file;
 
     _canonicalize_drivers();
     open my $fh, '>', $file or croak "Can't open $file for writing: $!";
@@ -77,12 +77,13 @@ sub save_drivers {
 
 sub load_drivers {
     my ( $class, $file ) = @_;
-    $file ||= _rcfile();
+    $file = _rcfile() if !defined $file;
 
     my %args;
     open my $fh, '<', $file or croak "Can't open $file for reading: $!";
     while (<$fh>) {
         next if /^\s*(?:#|$)/;    # skip blank lines and comments
+        chomp;
 
         /\s*(\w+)\s*=\s*(.*)\s*/ && do {
             my ( $key, $value ) = ( $1, $2 );
@@ -97,7 +98,7 @@ sub load_drivers {
             };
 
         # unknown line
-        croak "Can't parse line at $file, line $.:\n$_\n ";
+        croak "Can't parse line at $file, line $.:\n  <$_>";
     }
     push @DRIVERS, Test::Database::Driver->new(%args)
         if keys %args;
@@ -120,10 +121,10 @@ sub drivers {
         {
             next
                 if exists $request->{min_version}
-                    && $driver->{version} < $request->{min_version};
+                    && $driver->version() < $request->{min_version};
             next
                 if exists $request->{max_version}
-                    && $driver->{version} > $request->{max_version};
+                    && $driver->version() > $request->{max_version};
             push @drivers, $driver;
         }
     }
@@ -143,11 +144,6 @@ sub handles {
 
     # then on the handles
     return map { $_->handles(@requests) } @drivers;
-}
-
-sub dbh {
-    my ( $class, @requests ) = @_;
-    return map { $_->dbh() } $class->handles(@requests);
 }
 
 sub cleanup {
@@ -296,21 +292,68 @@ that exists in each driver.
 
 See L<REQUESTS> for details about writing requests.
 
-=item dbh( @requests )
-
-Return the DBI database handles for the given C<@requests>.
-
-It returns a dbh for each handle that would be returned by
-calling C<handles( @requests )>.
-
-See L<REQUESTS> for details about writing requests.
-See C<Test::Database::Handle> for details about handles.
-
 =item cleanup()
 
 Call the C<cleanup()> method of all available drivers.
 
 =back
+
+=head1 REQUESTS
+
+The C<drivers()>, C<handles()> and C<dbh()> methods tales I<requests>
+as parameters. A request is a simple hash reference, with a number of
+recognized keys.
+
+Some keys have an effect on driver selection:
+
+=over 4
+
+=item *
+
+C<driver>: driver name
+
+If missing, all available drivers will match.
+
+=item *
+
+C<min_version>: minimum database engine version
+
+Only database engines having at least the given minimum version will match.
+
+=item *
+
+C<max_version>: maximum database engine version
+
+Only database engines having at least the given maximum version will match.
+
+=back
+
+Others have an effect on actual database selection:
+
+=over 4
+
+=item *
+
+C<name>: name of the database to select or create.
+
+If a database of the given name exists in the select database engine,
+a handle to it will be returned.
+
+If the field is missing, a new database will be created with an
+automatically generated name.
+
+=item *
+
+C<keep>: boolean
+
+By default, database are dropped at the end of the program's life.
+If this parameter is true, the database will not be dropped, and
+can be selected again using its name.
+
+=back
+
+A request can also consist of a single string, in which case it is
+interpreted as a shortcut for C<{ driver => $string }>.
 
 =head1 AUTHOR
 
