@@ -161,7 +161,12 @@ sub _version      { die "$_[0] doesn't have a _version() method\n" }
 sub dsn           { die "$_[0] doesn't have a dsn() method\n" }
 
 sub create_database {
-    goto &_filebased_create_database if $_[0]->is_filebased();
+    my ( $self, $dbname ) = @_;
+    if ( $self->is_filebased() ) {
+        croak "Invalid database name: $dbname"
+            if $dbname && $dbname !~ /^\w+$/;
+        goto &_filebased_create_database;
+    }
     die "$_[0] doesn't have a create_database() method\n";
 }
 
@@ -178,7 +183,7 @@ sub _bare_dsn    { join ':', 'dbi', $_[0]->name(), ''; }
 #
 # PRIVATE METHODS
 #
-sub _basename { return 'Test_Database_' . $_[0]->name() . '_' }
+sub _basename { return lc 'Test_Database_' . $_[0]->name() . '_' }
 
 sub _filebased_databases {
     my ($self) = @_;

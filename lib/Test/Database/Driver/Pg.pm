@@ -1,26 +1,28 @@
-package Test::Database::Driver::mysql;
+package Test::Database::Driver::Pg;
 use strict;
 use warnings;
-
-use DBI;
+use Carp;
 
 use Test::Database::Driver;
 our @ISA = qw( Test::Database::Driver );
 
 sub _version {
-    return DBI->connect( $_[0]->connection_info() )
-        ->selectcol_arrayref('SELECT VERSION()')->[0];
+    DBI->connect_cached( $_[0]->connection_info() )
+        ->selectcol_arrayref('SELECT VERSION()')->[0] =~ /^PostgreSQL (\S+) /;
+    return $1;
 }
 
 sub _bare_dsn {
-    return 'dbi:mysql:' . join ';',
-        map {"$_=$_[0]->{$_}"} grep { $_[0]->{$_} } qw( host port );
+    return 'dbi:Pg:' . join ';',
+        map ( {"$_=$_[0]->{$_}"} grep { $_[0]->{$_} } qw( host port ) ),
+        'dbname=postgres';
 }
 
 sub dsn {
-    return 'dbi:mysql:' . join ';',
+    my ( $self, $dbname ) = @_;
+    return 'dbi:Pg:' . join ';',
         map( {"$_=$_[0]->{$_}"} grep { $_[0]->{$_} } qw( host port ) ),
-        "database=$_[1]";
+        "dbname=$_[1]";
 }
 
 sub essentials {qw< host port username password >}
@@ -28,12 +30,14 @@ sub essentials {qw< host port username password >}
 sub create_database {
     my ( $self, $dbname, $keep ) = @_;
     $dbname = $self->available_dbname() if !$dbname;
+    croak "Invalid database name '$dbname'" if $dbname !~ /^\w+$/;
 
     # create the database if it doesn't exist
-    $self->drh()
-        ->func( 'createdb', $dbname,
-        join( ':', $self->{host}, $self->{port} ),
-        $self->{username}, $self->{password}, 'admin' );
+    if ( !grep { $_ eq $dbname } $self->databases() ) {
+        my $dbh = DBI->connect_cached( $self->connection_info() );
+        $dbh->do( "CREATE DATABASE $dbname" );
+    }
+
     $self->register_drop($dbname) if !$keep;
 
     # return the handle
@@ -48,20 +52,21 @@ sub create_database {
 
 sub drop_database {
     my ( $self, $dbname ) = @_;
-    $self->drh()
-        ->func( 'dropdb', $dbname, join( ':', $self->{host}, $self->{port} ),
-        $self->{username}, $self->{password}, 'admin' )
-        if grep { $_ eq $dbname } $self->databases();
+    return if !grep { $_ eq $dbname } $self->databases();
+
+    croak "Invalid database name '$dbname'" if $dbname !~ /^\w+$/;
+    my $dbh = DBI->connect_cached( $self->connection_info() );
+    $dbh->do( "DROP DATABASE $dbname" );
 }
 
 sub databases {
     my ($self) = @_;
     my $databases = eval {
         DBI->connect_cached( $self->connection_info() )
-            ->selectall_arrayref('SHOW DATABASES');
+            ->selectall_arrayref(
+            'SELECT datname FROM pg_catalog.pg_database');
     };
-    return
-        grep { $_ !~ /^(?:information_schema|mysql)/ } map {@$_} @$databases;
+    return grep { $_ !~ /^(?:postgres|template\d*)/ } map {@$_} @$databases;
 }
 
 sub cleanup {
@@ -70,22 +75,22 @@ sub cleanup {
     $self->drop_database($_) for grep {/$basename/} $self->databases();
 }
 
-'mysql';
+'Pg';
 
 __END__
 
 =head1 NAME
 
-Test::Database::Driver::mysql - A Test::Database driver for mysql
+Test::Database::Driver::Pg - A Test::Database driver for Pg
 
 =head1 SYNOPSIS
 
     use Test::Database;
-    my $dbh = Test::Database->dbh( 'mysql' );
+    my $dbh = Test::Database->dbh( 'Pg' );
 
 =head1 DESCRIPTION
 
-This module is the C<Test::Database> driver for C<DBD::mysql>.
+This module is the C<Test::Database> driver for C<DBD::Pg>.
 
 =head1 SEE ALSO
 
@@ -94,11 +99,6 @@ L<Test::Database::Driver>
 =head1 AUTHOR
 
 Philippe Bruhat (BooK), C<< <book@cpan.org> >>
-
-=head1 ACKNOWLEDGEMENTS
-
-Many thanks to Kristian Köhntopp who helped me while writing a
-previous version of this module (before C<Test::Database> 0.03).
 
 =head1 COPYRIGHT
 
