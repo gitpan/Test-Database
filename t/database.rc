@@ -1,13 +1,14 @@
 # example correct .test-database.rc file
 
 # mysql
-driver = mysql
-host   = localhost
-username = root
-password = "s3k r3t"
+dsn      = dbi:mysql:database=mydb;host=localhost;port=1234
+username = user
+password = s3k r3t
 
-# some file-based drivers
-driver = SQLite
+# another
+dsn      = dbi:mysql:database=mydb;host=remotehost;port=5678
+username = otheruser
 
-driver = CSV
+# sqlite
+dsn      = dbi:SQLite:db.sqlite
 

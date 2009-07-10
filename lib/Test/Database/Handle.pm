@@ -2,9 +2,10 @@ package Test::Database::Handle;
 use strict;
 use warnings;
 use Carp;
+use DBI;
 
 # basic accessors
-for my $attr (qw( driver dsn username password name )) {
+for my $attr (qw( dbd dsn username password )) {
     no strict 'refs';
     *{$attr} = sub { return $_[0]{$attr} };
 }
@@ -13,20 +14,24 @@ sub new {
     my ( $class, %args ) = @_;
 
     exists $args{$_} or croak "$_ argument required"
-       for qw< driver dsn name >;
+       for qw( dsn );
+
+    my ( $scheme, $driver, $attr_string, $attr_hash, $driver_dsn )
+        = DBI->parse_dsn( $args{dsn} );
 
     return bless {
         username => '',
         password => '',
         %args,
+        dbd => $driver,
     }, $class;
 }
 
-sub connection_info { return @{ $_[0] }{qw< dsn username password >} }
+sub connection_info { return @{ $_[0] }{qw( dsn username password )} }
 
 sub dbh {
-    my ($self) = @_;
-    return $self->{dbh} ||= DBI->connect( $self->connection_info() );
+    my ( $self, $attr ) = @_;
+    return $self->{dbh} ||= DBI->connect( $self->connection_info(), $attr );
 }
 
 'IDENTITY';
@@ -41,12 +46,18 @@ Test::Database::Handle - A class for Test::Database handles
 
     use Test::Database;
 
-    my $handle = Test::Database->handle( SQLite => 'test' );
+    my $handle = Test::Database->handle(@requests);
+    my $dbh    = $handle->dbh();
 
 =head1 DESCRIPTION
 
 C<Test::Database::Handle> is a very simple class for encapsulating the
 information about a test database handle.
+
+C<Test::Database::Handle> objects are used within a test script to
+obtain the necessary information about a test database handle.
+Handles are obtained through the C<< Test::Database->handles() >>
+or C<< Test::Database->handle() >> methods.
 
 =head1 METHODS
 
@@ -56,7 +67,7 @@ C<Test::Database::Handle> provides the following methods:
 
 =item new( %args )
 
-Return a new C<Test::Database::Handle> with the given arguments
+Return a new C<Test::Database::Handle> with the given parameters
 (C<dsn>, C<username>, C<password>).
 
 The only mandatory argument is C<dsn>.
@@ -83,18 +94,17 @@ Return the connection password.
 
 Return the connection information tripler (C<dsn>, C<username>, C<password>).
 
-=item dbh()
+=item dbh( [ $attr ] )
 
 Return the DBI database handle obtained when connecting with the
 connection triplet returned by C<connection_info()>.
 
-=item driver()
+The optional parameter C<$attr> is a reference to a hash of connection
+attributes, passed directly to DBI's C<connect()> method.
+
+=item dbd()
 
 Return the DBI driver name, as computed from the C<dsn>.
-
-=item name()
-
-Name of the database in the corresponding driver.
 
 =back
 
