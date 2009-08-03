@@ -7,15 +7,55 @@ use File::Spec;
 use DBI;
 use Carp;
 
+use Test::Database::Util;
+use Test::Database::Driver;
 use Test::Database::Handle;
 
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
-# internal data structure
+#
+# global configuration
+#
+
+# internal data structures
 my @HANDLES;
+my @DRIVERS;
+
+# driver information
+my @DRIVERS_OUR;
+my @DRIVERS_OK;
+
+# find the list of all drivers we support
+sub load_drivers {
+    my %seen;
+    for my $dir (@INC) {
+        opendir my $dh, File::Spec->catdir( $dir, qw( Test Database Driver ) )
+            or next;
+        $seen{$_}++ for map { s/\.pm$//; $_ } grep {/\.pm$/} readdir $dh;
+        closedir $dh;
+    }
+
+    # drivers we support
+    @DRIVERS_OUR = sort keys %seen;
+
+    # available DBI drivers
+    my %DRIVERS_DBI = map { $_ => 1 } DBI->available_drivers();
+
+    # supported
+    @DRIVERS_OK = grep { exists $DRIVERS_DBI{$_} } @DRIVERS_OUR;
+
+    # actual driver objects
+    @DRIVERS = map {
+        my $driver;
+        eval { $driver = Test::Database::Driver->new( dbd => $_ ); 1; }
+            or warn "$@\n";
+        $driver || ();
+    } @DRIVERS_OK;
+}
 
 # startup configuration
 __PACKAGE__->load_config() if -e _rcfile();
+__PACKAGE__->load_drivers();
 
 #
 # private functions
@@ -25,41 +65,12 @@ sub _rcfile {
     File::Spec->catfile( File::HomeDir->my_data(), '.test-database' );
 }
 
-# return a list of hashrefs representing each configuration section
-sub _read_file {
-    my ($file) = @_;
-    my @config;
-
-    open my $fh, '<', $file or croak "Can't open $file for reading: $!";
-    my %args;
-    while (<$fh>) {
-        next if /^\s*(?:#|$)/;    # skip blank lines and comments
-        chomp;
-
-        /\s*(\w+)\s*=\s*(.*)\s*/ && do {
-            my ( $key, $value ) = ( $1, $2 );
-            if ( $key eq 'dsn' ) {
-                push @config, {%args} if keys %args;
-                %args = ();
-            }
-            $args{$key} = $value;
-            next;
-        };
-
-        # unknown line
-        croak "Can't parse line at $file, line $.:\n  <$_>";
-    }
-    push @config, {%args} if keys %args;
-    close $fh;
-
-    return @config;
-}
-
 #
 # methods
 #
 sub clean_config {
     @HANDLES = ();
+    @DRIVERS = ();
 }
 
 sub load_config {
@@ -71,12 +82,23 @@ sub load_config {
         map { _read_file($_) } @files;
 }
 
+sub list_drivers {
+    my ( $class, $type ) = @_;
+    $type ||= '';
+    return
+          $type eq 'all'       ? @DRIVERS_OUR
+        : $type eq 'available' ? @DRIVERS_OK
+        :                        map { $_->name() } @DRIVERS;
+}
+
 # requests for handles
 sub handles {
     my ( $class, @requests ) = @_;
+    my @handles;
 
     # empty request means "everything"
-    return @HANDLES if !@requests;
+    return @handles = ( @HANDLES, map { $_->make_handle() } @DRIVERS )
+        if !@requests;
 
     # turn strings (driver name) into actual requests
     @requests = map { (ref) ? $_ : { dbd => $_ } } @requests;
@@ -85,11 +107,20 @@ sub handles {
     $_->{dbd} ||= delete $_->{driver} for @requests;
 
     # get the matching handles
-    my @handles;
     for my $handle (@HANDLES) {
         push @handles, $handle
-            if grep { $_->{dbd} eq $handle->{dbd} } @requests;
+            if grep { $_->{dbd} eq $handle->dbd() } @requests;
     }
+
+    # get the matching drivers
+    my @drivers;
+    for my $driver (@DRIVERS) {
+        push @drivers, $driver
+            if grep { $_->{dbd} eq $driver->dbd() } @requests;
+    }
+
+    # get a new database handle from the drivers
+    push @handles, map { $_->make_handle() } @drivers;
 
     # then on the handles
     return @handles;
@@ -189,6 +220,22 @@ C<Test::Database> provides the following methods:
 
 =over 4
 
+=item list_drivers( [$type] )
+
+Return a list of driver names of the given "type".
+
+C<all> returns the list of all existing C<Test::Database::Driver> subclasses.
+
+C<available> returns the list of C<Test::Database::Driver> subclasses for which the matching
+C<DBD> class is available.
+
+Called with no parameter (or anything not matching C<all> or C<available>), it will return
+the list of currently loaded drivers.
+
+=item load_drivers()
+
+Load the available drivers from the system (file-based drivers, usually).
+
 =item load_config( @files )
 
 Read configuration from the files in C<@files>.
@@ -198,6 +245,7 @@ If no file is provided, the local equivalent of F<~/.test-database> is used.
 =item clean_config()
 
 Empties whatever configuration has already been loaded.
+Also removes the loaded drivers list.
 
 =item handles( @requests )
 
@@ -302,22 +350,6 @@ Some of the items on the TODO list:
 
 =item *
 
-Bring back the C<Test::Database::Driver> modules from the limbo
-they were put after version 0.99_04. First, for file-based drivers,
-eventually for other database engines.
-
-=item *
-
-Simple support for always getting the same database between test scriptS.
-
-=item *
-
-Ensure each test suite gets a different database, if possible.
-(It's impossible with fixed DSN gotten from the configuration file,
-but rather trivial with file-based drivers.)
-
-=item *
-
 Write a Cookbook/Tutorial to make adoption easier for testers and module
 authors.
 
@@ -325,6 +357,10 @@ authors.
 
 Add a database engine autodetection script/module, to automatically
 write the F<.test-database> configuration file.
+
+=item *
+
+Include drivers in the F<.test-database> file.
 
 =back
 
