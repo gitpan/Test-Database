@@ -13,31 +13,39 @@ my @good = (
         username => 'otheruser',
     },
     { dsn => 'dbi:SQLite:db.sqlite' },
+    {   driver_dsn => 'dbi:mysql:host=remotehost;port=5678',
+        username   => 'otheruser',
+    },
 );
 
-plan tests => 1 + @good + 3;
+my @bad = (
+    [   File::Spec->catfile(qw< t database.bad >),
+        qr/^Can't parse line at .*, line \d+:\n  <bad format> at /
+    ],
+    [ 'missing', qr/^Can't open missing for reading: / ],
+);
+
+plan tests => 1 + @good + 2 * @bad + 1;
 
 # load a correct file
 my $file   = File::Spec->catfile(qw< t database.rc >);
 my @config = _read_file($file);
 
 is( scalar @config, scalar @good,
-    "Got @{[scalar @good]} drivers from $file" );
+    "Got @{[scalar @good]} handles from $file" );
 
 for my $test (@good) {
     my $args = shift @config;
-    is_deeply( $args, $test, "Read args for driver $test->{dsn}" );
+    is_deeply( $args, $test,
+        "Read args for handle " . ( $test->{dsn} || $test->{driver_dsn} ) );
 }
 
 # try to load a bad file
-$file = File::Spec->catfile(qw< t database.bad >);
-ok( !eval { _read_file($file); 1 },
-    "_read_file( $file ) failed" );
-like(
-    $@,
-    qr/^Can't parse line at .*, line \d+:\n  <bad format> at /,
-    'Expected error message'
-);
+for my $t (@bad) {
+    my ( $file, $regex ) = @$t;
+    ok( !eval { _read_file($file); 1 }, "_read_file( $file ) failed" );
+    like( $@, $regex, 'Expected error message' );
+}
 
 # load an empty file
 $file = File::Spec->catfile(qw< t database.empty >);
