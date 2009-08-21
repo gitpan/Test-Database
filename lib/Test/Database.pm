@@ -11,7 +11,7 @@ use Test::Database::Util;
 use Test::Database::Driver;
 use Test::Database::Handle;
 
-our $VERSION = '1.02';
+our $VERSION = '1.03';
 
 #
 # global configuration
@@ -59,8 +59,8 @@ sub load_drivers {
 }
 
 # startup configuration
-__PACKAGE__->load_config() if -e _rcfile();
 __PACKAGE__->load_drivers();
+__PACKAGE__->load_config() if -e _rcfile();
 
 #
 # private functions
@@ -105,6 +105,8 @@ sub list_drivers {
         :                        map { $_->name() } @DRIVERS;
 }
 
+sub drivers { @DRIVERS }
+
 # requests for handles
 sub handles {
     my ( $class, @requests ) = @_;
@@ -122,15 +124,30 @@ sub handles {
 
     # get the matching handles
     for my $handle (@HANDLES) {
-        push @handles, $handle
-            if grep { $_->{dbd} eq $handle->dbd() } @requests;
+        my $ok;
+        my $driver = $handle->{driver};
+        for my $request (@requests) {
+            next if $request->{dbd} ne $handle->dbd();
+            if ( grep /^version(?:_m(?:ax|in))$/, keys %$request ) {
+                next if !$driver || !$driver->version_matches($request);
+            }
+            $ok = 1;
+            last;
+        }
+        push @handles, $handle if $ok;
     }
 
     # get the matching drivers
     my @drivers;
     for my $driver (@DRIVERS) {
-        push @drivers, $driver
-            if grep { $_->{dbd} eq $driver->dbd() } @requests;
+        my $ok;
+        for my $request (@requests) {
+            next if $request->{dbd} ne $driver->dbd();
+            next if !$driver->version_matches($request);
+            $ok = 1;
+            last;
+        }
+        push @drivers, $driver if $ok;
     }
 
     # get a new database handle from the drivers
@@ -246,6 +263,11 @@ C<DBD> class is available.
 Called with no parameter (or anything not matching C<all> or C<available>), it will return
 the list of currently loaded drivers.
 
+=item drivers()
+
+Returns the C<Test::Database::Driver> instances that are setup by
+C<load_drivers()> and updated by C<load_config()>.
+
 =item load_drivers()
 
 Load the available drivers from the system (file-based drivers, usually).
@@ -291,6 +313,29 @@ C<dbd>: driver name (based on the C<DBD::> name).
 C<driver> is an alias for C<dbd>.
 If the two keys are present, the C<driver> key will be ignored.
 
+If missing, all available drivers will match.
+
+=item *
+
+C<version>: exact database engine version
+
+Only database engines having a version number identical to the
+given version will match.
+
+=item *
+
+C<min_version>: minimum database engine version
+
+Only database engines having a version number greater or equal to the
+given minimum version will match.
+
+=item *
+
+C<max_version>: maximum database engine version
+
+Only database engines having a version number lower (and not equal) to the
+given maximum version will match.
+
 =back
 
 A request can also consist of a single string, in which case it is
@@ -300,7 +345,7 @@ interpreted as a shortcut for C<{ dbd => $string }>.
 
 The list of available, authorized DSN is stored in the local equivalent
 of F<~/.test-database>. It's a simple list of key/value pairs, with the
-C<dsn> key being used to split successive entries:
+C<dsn> or C<driver_dsn> keys being used to split successive entries:
 
     # mysql
     dsn      = dbi:mysql:database=mydb;host=localhost;port=1234
@@ -312,6 +357,10 @@ C<dsn> key being used to split successive entries:
     
     # sqlite
     dsn      = dbi:SQLite:db.sqlite
+
+    # a "driver" with full access (create/drop databases)
+    driver_dsn = dbi:mysql:
+    username   = root
 
 The C<username> and C<password> keys are optional and empty strings will be
 used if they are not provided.

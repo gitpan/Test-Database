@@ -22,13 +22,16 @@ my @bad = (
     [   File::Spec->catfile(qw< t database.bad >),
         qr/^Can't parse line at .*, line \d+:\n  <bad format> at /
     ],
+    [   File::Spec->catfile(qw< t database.bad2 >),
+        qr/^Record doesn't start with dsn or driver_dsn .*, line \d+:\n  <drh      = dbi:mysql:> at /
+    ],
     [ 'missing', qr/^Can't open missing for reading: / ],
 );
 
 plan tests => 1 + @good + 2 * @bad + 1;
 
 # load a correct file
-my $file   = File::Spec->catfile(qw< t database.rc >);
+my $file   = File::Spec->catfile(qw< t database.good >);
 my @config = _read_file($file);
 
 is( scalar @config, scalar @good,
