@@ -1,19 +1,19 @@
-package Test::Database::Driver::mysql;
+package Test::Database::Driver::Pg;
 use strict;
 use warnings;
-
-use DBI;
+use Carp;
 
 use Test::Database::Driver;
 our @ISA = qw( Test::Database::Driver );
 
 sub _version {
-    return DBI->connect( $_[0]->connection_info() )
-        ->selectcol_arrayref('SELECT VERSION()')->[0];
+    DBI->connect_cached( $_[0]->connection_info() )
+        ->selectcol_arrayref('SELECT VERSION()')->[0] =~ /^PostgreSQL (\S+) /;
+    return $1;
 }
 
 sub create_database {
-    my ( $self ) = @_;
+    my ($self) = @_;
     my $dbname = $self->available_dbname();
 
     DBI->connect_cached( $self->connection_info() )
@@ -42,27 +42,28 @@ sub databases {
     my $basename  = qr/^@{[$self->_basename()]}/;
     my $databases = eval {
         DBI->connect_cached( $self->connection_info() )
-            ->selectall_arrayref('SHOW DATABASES');
+            ->selectall_arrayref(
+            'SELECT datname FROM pg_catalog.pg_database');
     };
     return grep {/$basename/} map {@$_} @$databases;
 }
 
-'mysql';
+'Pg';
 
 __END__
 
 =head1 NAME
 
-Test::Database::Driver::mysql - A Test::Database driver for mysql
+Test::Database::Driver::Pg - A Test::Database driver for Pg
 
 =head1 SYNOPSIS
 
     use Test::Database;
-    my @handles = Test::Database->handles( 'mysql' );
+    my @handles = Test::Database->handles( 'Pg' );
 
 =head1 DESCRIPTION
 
-This module is the C<Test::Database> driver for C<DBD::mysql>.
+This module is the C<Test::Database> driver for C<DBD::Pg>.
 
 =head1 SEE ALSO
 
@@ -71,11 +72,6 @@ L<Test::Database::Driver>
 =head1 AUTHOR
 
 Philippe Bruhat (BooK), C<< <book@cpan.org> >>
-
-=head1 ACKNOWLEDGEMENTS
-
-Many thanks to Kristian Köhntopp who helped me while writing a
-previous version of this module (before C<Test::Database> 0.03).
 
 =head1 COPYRIGHT
 

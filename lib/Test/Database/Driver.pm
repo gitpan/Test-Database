@@ -15,10 +15,12 @@ use Test::Database::Handle;
 #
 
 # the location where all drivers-related files will be stored
-my $root
-    = File::Spec->rel2abs(
-    File::Spec->catdir( File::Spec->tmpdir(), 'Test-Database-' . getlogin() )
-    );
+my $root = File::Spec->rel2abs(
+    File::Spec->catdir(
+        File::Spec->tmpdir(),
+        'Test-Database-' . ( getlogin() || getpwuid($<) )
+    )
+);
 
 # generic driver class initialisation
 sub __init {
@@ -117,11 +119,14 @@ sub _save_mapping {
 }
 
 sub make_dsn {
-    my ($self, %args) = @_;
+    my ($self, @args, @pairs) = @_;
+
+    push @pairs, join '=', splice @args, 0, 2 while @args;
+
     my $dsn = $self->driver_dsn();
     return $dsn
         . ( $dsn =~ /^dbi:[^:]+:$/ ? '' : ';' )
-        . join( ';', map "$_=$args{$_}", keys %args );
+        . join( ';', @pairs  );
 }
 
 sub make_handle {
