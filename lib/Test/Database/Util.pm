@@ -16,7 +16,7 @@ sub _read_file {
     my @config;
 
     open my $fh, '<', $file or croak "Can't open $file for reading: $!";
-    my $re_header = qr/^(?:driver_)?dsn$/;
+    my $re_header = qr/^(?:(?:driver_)?dsn|key)$/;
     my %args;
     my $records;
     while (<$fh>) {
@@ -30,8 +30,10 @@ sub _read_file {
                 $records++;
                 %args = ();
             }
-            croak "Record doesn't start with dsn or driver_dsn at $file, line $.:\n  <$_>"
-                if !$records && $key !~ $re_header;
+            elsif ( !$records ) {
+                croak "Record doesn't start with dsn or driver_dsn or key "
+                    . "at $file, line $.:\n  <$_>";
+            }
             $args{$key} = $value;
             next;
         };
