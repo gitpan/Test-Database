@@ -11,7 +11,7 @@ use Test::Database::Util;
 use Test::Database::Driver;
 use Test::Database::Handle;
 
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 #
 # global configuration
@@ -356,12 +356,9 @@ C<dsn>, C<driver_dsn> or C<key> keys being used to split successive entries:
     username = user
     password = s3k r3t
     
-    # DBD::CSV
-    dsn      = dbi:CSV:f_dir=test-db
+    # Oracle
+    dsn      = dbi:Oracle:test
     
-    # sqlite
-    dsn      = dbi:SQLite:db.sqlite
-
     # set a unique key when creating databases
     key = thwapp
 
