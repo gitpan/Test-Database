@@ -26,7 +26,8 @@ plan tests => ( 1 + ( 3 + @sql + 1 ) * 2 + 1 + 2) * @drivers;
 
 for my $driver (@drivers) {
     my $drname = $driver->name();
-    diag "Testing driver $drname " . $driver->version();
+    diag "Testing driver $drname " . $driver->version()
+        . ", DBD::$drname " . $driver->dbd_version();
     isa_ok( $driver, 'Test::Database::Driver' );
 
     my $count = 0;
@@ -64,6 +65,7 @@ for my $driver (@drivers) {
 
         # remove everything
         ok( $dbh->do($drop), "$desc: $drop" );
+        $dbh->disconnect();
     }
 
     ok( grep ( { $_ eq $old } $driver->databases() ),

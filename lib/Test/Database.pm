@@ -11,7 +11,7 @@ use Test::Database::Util;
 use Test::Database::Driver;
 use Test::Database::Handle;
 
-our $VERSION = '1.06';
+our $VERSION = '1.07';
 
 #
 # global configuration
@@ -225,8 +225,6 @@ the same one:
 You can use the same requests again if you need to use the same
 test databases over several test scripts.
 
-The C<cleanup()> method will drop all tables from C<supported> databases.
-
 =head1 DESCRIPTION
 
 Quoting Michael Schwern:
@@ -377,6 +375,9 @@ allows several hosts to share access to the same database server
 without risking a race condition when creating a new database. See
 L<Test::Database::Tutorial> for a longer explanation.
 
+Individual drivers may accept extra parameters. See their documetation
+for details. Unrecognized parameters and not used, and therefore ignored.
+
 =head1 AUTHOR
 
 Philippe Bruhat (BooK), C<< <book@cpan.org> >>
@@ -456,6 +457,11 @@ The work leading to the new implementation (version 0.99 and later)
 was carried on during the Perl QA Hackathon, held in Birmingham in March
 2009. Thanks to Birmingham.pm for organizing it and to Booking.com for
 sending me there.
+
+Thanks to the early adopters:
+Alexis Sukrieh (SUKRIA),
+Nicholas Bamber (SILASMONK)
+and Adam Kennedy (ADAMK).
 
 =head1 COPYRIGHT
 
