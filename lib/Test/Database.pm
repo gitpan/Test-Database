@@ -1,4 +1,5 @@
 package Test::Database;
+use 5.006;
 use warnings;
 use strict;
 
@@ -11,7 +12,7 @@ use Test::Database::Util;
 use Test::Database::Driver;
 use Test::Database::Handle;
 
-our $VERSION = '1.07';
+our $VERSION = '1.08';
 
 #
 # global configuration
@@ -91,12 +92,12 @@ sub load_config {
 
     # create the handles
     push @HANDLES,
-        map { Test::Database::Handle->new(%$_) }
+        map { eval { Test::Database::Handle->new(%$_) } || () }
         grep { exists $_->{dsn} } @items;
 
-    # create the handles
+    # create the drivers
     push @DRIVERS,
-        map { Test::Database::Driver->new(%$_) }
+        map { eval { Test::Database::Driver->new(%$_) } || () }
         grep { exists $_->{driver_dsn} } @items;
 }
 
@@ -424,17 +425,8 @@ Some of the items on the TODO list:
 
 =item *
 
-Write a Cookbook/Tutorial to make adoption easier for testers and module
-authors.
-
-=item *
-
 Add a database engine autodetection script/module, to automatically
 write the F<.test-database> configuration file.
-
-=item *
-
-Include drivers in the F<.test-database> file.
 
 =back
 
