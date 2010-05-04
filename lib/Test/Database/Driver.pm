@@ -179,16 +179,25 @@ sub make_handle {
 
 sub version_matches {
     my ( $self, $request ) = @_;
-    my $version = $self->version();
+
+    # string tests
+    my $version_string = $self->version_string();
     return
         if exists $request->{version}
-            && $version != $request->{version};
+            && $version_string ne $request->{version};
+    return
+        if exists $request->{regex_version}
+            && $version_string !~ $request->{regex_version};
+
+    # numeric tests
+    my $version = $self->version();
     return
         if exists $request->{min_version}
             && $version < $request->{min_version};
     return
         if exists $request->{max_version}
             && $version >= $request->{max_version};
+
     return 1;
 }
 
@@ -209,7 +218,12 @@ sub base_dir {
 
 sub version {
     no warnings;
-    return $_[0]{version} ||= version->new( $_[0]->_version() );
+    return $_[0]{version}
+        ||= version->new( $_[0]->_version() =~ /^([0-9._]*[0-9])/ );
+}
+
+sub version_string {
+    return $_[0]{version_string} ||= $_[0]->_version();
 }
 
 sub dbd_version { return "DBD::$_[0]{dbd}"->VERSION; }
@@ -373,6 +387,11 @@ if needed. Typically used by file-based database drivers.
 
 C<version> object representing the version of the underlying database enginge.
 This object is build with the return value of C<_version()>.
+
+=item version_string()
+
+Version string representing the version of the underlying database enginge.
+This string is the actual return value of C<_version()>.
 
 =item dbd_version()
 
