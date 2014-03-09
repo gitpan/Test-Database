@@ -1,4 +1,5 @@
 package Test::Database::Handle;
+$Test::Database::Handle::VERSION = '1.111';
 use strict;
 use warnings;
 use Carp;
@@ -21,8 +22,6 @@ sub new {
 
     # fix args
     %args = (
-        username => '',
-        password => '',
         %args,
         dbd => $driver,
     );
@@ -65,50 +64,51 @@ Test::Database::Handle - A class for Test::Database handles
 
 =head1 DESCRIPTION
 
-C<Test::Database::Handle> is a very simple class for encapsulating the
+Test::Database::Handle is a very simple class for encapsulating the
 information about a test database handle.
 
-C<Test::Database::Handle> objects are used within a test script to
+Test::Database::Handle objects are used within a test script to
 obtain the necessary information about a test database handle.
 Handles are obtained through the C<< Test::Database->handles() >>
 or C<< Test::Database->handle() >> methods.
 
 =head1 METHODS
 
-C<Test::Database::Handle> provides the following methods:
+Test::Database::Handle provides the following methods:
 
-=over 4
+=head2 new
 
-=item new( %args )
-
-Return a new C<Test::Database::Handle> with the given parameters
+Return a new Test::Database::Handle with the given parameters
 (C<dsn>, C<username>, C<password>).
 
 The only mandatory argument is C<dsn>.
 
-=back
+=head1 ACCESSORS
 
 The following accessors are available.
 
-=over 4
-
-=item dsn()
+=head2 dsn
 
 Return the Data Source Name.
 
-=item username()
+=head2 username
 
-Return the connection username.
+Return the connection username. Defaults to C<undef>.
 
-=item password()
+=head2 password
 
-Return the connection password.
+Return the connection password. Defaults to C<undef>.
 
-=item connection_info()
+=head2 connection_info
 
 Return the connection information triplet (C<dsn>, C<username>, C<password>).
 
-=item dbh( [ $attr ] )
+    my ( $dsn, $username, $password ) = $handle->connection_info;
+
+=head2 dbh
+
+    my $dbh = $handle->dbh;
+    my $dbh = $handle->dbh( $attr );
 
 Return the DBI database handle obtained when connecting with the
 connection triplet returned by C<connection_info()>.
@@ -116,19 +116,17 @@ connection triplet returned by C<connection_info()>.
 The optional parameter C<$attr> is a reference to a hash of connection
 attributes, passed directly to DBI's C<connect()> method.
 
-=item name()
+=head2 name
 
 Return the database name attached to the handle.
 
-=item dbd()
+=head2 dbd
 
 Return the DBI driver name, as computed from the C<dsn>.
 
-=item driver()
+=head2 driver
 
-Return the C<Test::Database::Driver> object attached to the handle.
-
-=back
+Return the L<Test::Database::Driver> object attached to the handle.
 
 =head1 AUTHOR
 

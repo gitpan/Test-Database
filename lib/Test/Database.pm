@@ -1,4 +1,5 @@
 package Test::Database;
+$Test::Database::VERSION = '1.111';
 use 5.006;
 use warnings;
 use strict;
@@ -11,8 +12,6 @@ use Carp;
 use Test::Database::Util;
 use Test::Database::Driver;
 use Test::Database::Handle;
-
-our $VERSION = '1.11';
 
 #
 # global configuration
@@ -228,79 +227,74 @@ test databases over several test scripts.
 
 =head1 DESCRIPTION
 
-Quoting Michael Schwern:
-
-I<There's plenty of modules which need a database, and they all have
-to be configured differently and they're always a PITA when you first
-install and each and every time they upgrade.>
-
-I<User setup can be dealt with by making Test::Database a build
-dependency. As part of Test::Database's install process it walks the
-user through the configuration process. Once it's done, it writes out
-a config file and then it's done for good.>
-
-See L<http://www.nntp.perl.org/group/perl.qa/2008/10/msg11645.html>
-for the thread that led to the creation of C<Test::Database>.
-
-C<Test::Database> provides a simple way for test authors to request
+Test::Database provides a simple way for test authors to request
 a test database, without worrying about environment variables or the
 test host configuration.
 
 See L<SYNOPSIS> for typical usage.
 
+See L<Test::Database::Tutorial> for more detailed explanations.
+
 =head1 METHODS
 
-C<Test::Database> provides the following methods:
+Test::Database provides the following methods:
 
-=over 4
+=head2 list_drivers
 
-=item list_drivers( [$type] )
+    my @drivers = Test::Database->list_drivers();
+    my @drivers = Test::Database->list_drivers('available');
 
 Return a list of driver names of the given "type".
 
-C<all> returns the list of all existing C<Test::Database::Driver> subclasses.
+C<all> returns the list of all existing L<Test::Database::Driver> subclasses.
 
-C<available> returns the list of C<Test::Database::Driver> subclasses for which the matching
+C<available> returns the list of L<Test::Database::Driver> subclasses for which the matching
 C<DBD> class is available.
 
 Called with no parameter (or anything not matching C<all> or C<available>), it will return
 the list of currently loaded drivers.
 
-=item drivers()
+=head2 drivers
 
-Returns the C<Test::Database::Driver> instances that are setup by
+Returns the L<Test::Database::Driver> instances that are setup by
 C<load_drivers()> and updated by C<load_config()>.
 
-=item load_drivers()
+=head2 load_drivers
 
 Load the available drivers from the system (file-based drivers, usually).
 
-=item load_config( @files )
+=head2 load_config
+
+    Test::Database->load_config($config);
 
 Read configuration from the files in C<@files>.
 
 If no file is provided, the local equivalent of F<~/.test-database> is used.
 
-=item clean_config()
+=head2 clean_config
+
+    Test::Database->clean_config();
 
 Empties whatever configuration has already been loaded.
 Also removes the loaded drivers list.
 
-=item handles( @requests )
+=head2 handles
 
-Return a set of C<Test::Database::Handle> objects that match the
+    my @handles = Test::Database->handles(@requests);
+
+Return a set of L<Test::Database::Handle> objects that match the
 given C<@requests>.
 
 If C<@requests> is not provided, return all the available handles.
 
 See L<REQUESTS> for details about writing requests.
 
-=item handle( @request )
+=head2 handle
+
+    my $handle = Test::Database->handle(@requests);
 
 I<Singular> version of C<handles()>, that returns the first matching
 handle.
-
-=back
 
 =head1 REQUESTS
 
@@ -372,7 +366,7 @@ C<dsn>, C<driver_dsn> or C<key> keys being used to split successive entries:
     driver_dsn = dbi:mysql:
     username   = root
 
-The C<username> and C<password> keys are optional and empty strings will be
+The C<username> and C<password> keys are optional and C<undef> will be
 used if they are not provided.
 
 Empty lines and comments are ignored.
@@ -437,11 +431,27 @@ write the F<.test-database> configuration file.
 
 =back
 
+=head1 HISTORY
+
+Quoting Michael Schwern:
+
+I<There's plenty of modules which need a database, and they all have
+to be configured differently and they're always a PITA when you first
+install and each and every time they upgrade.>
+
+I<User setup can be dealt with by making Test::Database a build
+dependency. As part of Test::Database's install process it walks the
+user through the configuration process. Once it's done, it writes out
+a config file and then it's done for good.>
+
+See L<http://www.nntp.perl.org/group/perl.qa/2008/10/msg11645.html>
+for the thread that led to the creation of Test::Database.
+
 =head1 ACKNOWLEDGEMENTS
 
 Thanks to C<< <perl-qa@perl.org> >> for early comments.
 
-Thanks to Nelson Ferraz for writing C<DBIx::Slice>, the testing of
+Thanks to Nelson Ferraz for writing L<DBIx::Slice>, the testing of
 which made me want to have a generic way to obtain a test database.
 
 Thanks to Mark Lawrence for discussing this module with me, and

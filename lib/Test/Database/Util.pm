@@ -1,4 +1,5 @@
 package Test::Database::Util;
+$Test::Database::Util::VERSION = '1.111';
 use strict;
 use warnings;
 use Carp;
@@ -63,23 +64,21 @@ Test::Database::Util - Utility functions for Test::Database modules
 
 =head1 DESCRIPTION
 
-C<Test::Database::Util> exports a collection of functions used by
+Test::Database::Util exports a collection of functions used by
 several modules in the C<Test-Database> distribution.
 
 =head1 EXPORTED FUNCTIONS
 
-All functions provided by C<Test::Database::Util> are exported in the
+All functions provided by Test::Database::Util are exported in the
 calling package.
 
 The following functions are provided:
 
-=over 4
+=head2 _read_file
 
-=item _read_file( $file )
+    _read_file( $file )
 
 Return a list of hash references, read in the given C<$file> file.
-
-=back
 
 =head1 AUTHOR
 

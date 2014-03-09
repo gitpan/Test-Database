@@ -1,4 +1,5 @@
 package Test::Database::Driver::CSV;
+$Test::Database::Driver::CSV::VERSION = '1.111';
 use strict;
 use warnings;
 
@@ -40,7 +41,7 @@ Test::Database::Driver::CSV - A Test::Database driver for CSV
 
 =head1 DESCRIPTION
 
-This module is the C<Test::Database> driver for C<DBD::CSV>.
+This module is the L<Test::Database> driver for L<DBD::CSV>.
 
 =head1 SEE ALSO
 

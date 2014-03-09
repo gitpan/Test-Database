@@ -1,4 +1,5 @@
 package Test::Database::Driver::Pg;
+$Test::Database::Driver::Pg::VERSION = '1.111';
 use strict;
 use warnings;
 use Carp;
@@ -64,7 +65,7 @@ Test::Database::Driver::Pg - A Test::Database driver for Pg
 
 =head1 DESCRIPTION
 
-This module is the C<Test::Database> driver for C<DBD::Pg>.
+This module is the L<Test::Database> driver for L<DBD::Pg>.
 
 =head1 EXTRA PARAMETERS
 
