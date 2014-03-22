@@ -28,7 +28,7 @@ my %WriteMakefileArgs = (
     "File::HomeDir" => 0,
     "File::Path" => 0,
     "File::Spec" => 0,
-    "YAML::Tiny" => 0,
+    "YAML::Tiny" => "1.62",
     "strict" => 0,
     "version" => 0,
     "warnings" => 0
@@ -40,7 +40,7 @@ my %WriteMakefileArgs = (
     "SQL::Statement" => 0,
     "Test::More" => "0.88"
   },
-  "VERSION" => "1.111",
+  "VERSION" => "1.112",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -60,7 +60,7 @@ my %FallbackPrereqs = (
   "List::Util" => 0,
   "SQL::Statement" => 0,
   "Test::More" => "0.88",
-  "YAML::Tiny" => 0,
+  "YAML::Tiny" => "1.62",
   "strict" => 0,
   "version" => 0,
   "warnings" => 0

@@ -1,5 +1,5 @@
 package Test::Database;
-$Test::Database::VERSION = '1.111';
+$Test::Database::VERSION = '1.112';
 use 5.006;
 use warnings;
 use strict;
@@ -60,14 +60,20 @@ sub load_drivers {
 
 # startup configuration
 __PACKAGE__->load_drivers();
-__PACKAGE__->load_config() if -e _rcfile();
+__PACKAGE__->load_config();
 
 #
 # private functions
 #
 # location of our resource file
 sub _rcfile {
-    File::Spec->catfile( File::HomeDir->my_data(), '.test-database' );
+    my $basename = '.test-database';
+    my $rc = File::Spec->catfile( File::HomeDir->my_home(), $basename );
+    return $rc if -e $rc;
+
+    # while transitioning to the new scheme, give the old name if it exists
+    my $old = File::Spec->catfile( File::HomeDir->my_data(), $basename );
+    return -e $old ? $old : $rc;
 }
 
 #
@@ -80,7 +86,7 @@ sub clean_config {
 
 sub load_config {
     my ( $class, @files ) = @_;
-    @files = ( _rcfile() ) if !@files;
+    @files = grep -e, _rcfile() if !@files;
 
     # fetch the items (dsn, driver_dsn) from the config files
     my @items = map { _read_file($_) } @files;
@@ -377,7 +383,7 @@ allows several hosts to share access to the same database server
 without risking a race condition when creating a new database. See
 L<Test::Database::Tutorial> for a longer explanation.
 
-Individual drivers may accept extra parameters. See their documetation
+Individual drivers may accept extra parameters. See their documentation
 for details. Unrecognized parameters and not used, and therefore ignored.
 
 =head1 AUTHOR

@@ -1,5 +1,5 @@
 package Test::Database::Driver::SQLite;
-$Test::Database::Driver::SQLite::VERSION = '1.111';
+$Test::Database::Driver::SQLite::VERSION = '1.112';
 use strict;
 use warnings;
 

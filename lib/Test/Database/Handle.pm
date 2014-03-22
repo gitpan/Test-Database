@@ -1,5 +1,5 @@
 package Test::Database::Handle;
-$Test::Database::Handle::VERSION = '1.111';
+$Test::Database::Handle::VERSION = '1.112';
 use strict;
 use warnings;
 use Carp;

@@ -1,5 +1,5 @@
 package Test::Database::Driver::mysql;
-$Test::Database::Driver::mysql::VERSION = '1.111';
+$Test::Database::Driver::mysql::VERSION = '1.112';
 use strict;
 use warnings;
 
