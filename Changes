@@ -1,5 +1,10 @@
 Revision history for Test-Database
 
+1.113 Sun May 25 2014
+        [IMPROVEMENTS]
+        - recommend DBD::CSV 0.30 (RT #59437)
+        - recommend DBD::SQLite 1.27 (RT #90631)
+
 1.112 Sat Mar 22 2014
         [IMPROVEMENTS]
         - use File::HomeDir's my_home() instead of my_data() (RT #93678)

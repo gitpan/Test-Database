@@ -1,5 +1,5 @@
 package Test::Database;
-$Test::Database::VERSION = '1.112';
+$Test::Database::VERSION = '1.113';
 use 5.006;
 use warnings;
 use strict;

@@ -1,5 +1,5 @@
 package Test::Database::Driver::CSV;
-$Test::Database::Driver::CSV::VERSION = '1.112';
+$Test::Database::Driver::CSV::VERSION = '1.113';
 use strict;
 use warnings;
 

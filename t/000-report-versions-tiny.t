@@ -50,7 +50,9 @@ sub pmver {
 
 eval { $v .= pmver('Carp','any version') };
 eval { $v .= pmver('Cwd','any version') };
+eval { $v .= pmver('DBD::CSV','0.30') };
 eval { $v .= pmver('DBD::DBM','any version') };
+eval { $v .= pmver('DBD::SQLite','1.27') };
 eval { $v .= pmver('DBI','any version') };
 eval { $v .= pmver('ExtUtils::MakeMaker','6.30') };
 eval { $v .= pmver('File::Find','any version') };

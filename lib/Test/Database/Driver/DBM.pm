@@ -1,5 +1,5 @@
 package Test::Database::Driver::DBM;
-$Test::Database::Driver::DBM::VERSION = '1.112';
+$Test::Database::Driver::DBM::VERSION = '1.113';
 use strict;
 use warnings;
 

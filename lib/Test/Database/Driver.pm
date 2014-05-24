@@ -1,5 +1,5 @@
 package Test::Database::Driver;
-$Test::Database::Driver::VERSION = '1.112';
+$Test::Database::Driver::VERSION = '1.113';
 use strict;
 use warnings;
 use Carp;
